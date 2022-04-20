@@ -1,4 +1,7 @@
 package com.company;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Scanner;
 public class Main {
     static double[][] GetRandomSymMatr(int n){
@@ -11,17 +14,25 @@ public class Main {
         }
         return symMatr;
     }
-    static double[][] GetIdentityMatrix(int size){
-        double[][] identityMatrix = new double[size][size];
+    static double[][] GetCustomMatrix(int size,boolean isIdentity, boolean isHilbert){
+        double[][] customMatrix = new double[size][size];
+        if(isHilbert){
+            for(int i=0;i<size;i++){
+                for(int j=0;j<size;j++){
+                    customMatrix[i][j] = (double) 1 / (j + i + 1);
+                }
+            }
+            return customMatrix;
+        }
         for(int i=0;i<size;i++){
             for(int j=0; j<size;j++){
-                if(i==j)
-                    identityMatrix[i][j] = 1;
+                if(i==j && isIdentity)
+                    customMatrix[i][j] = 1;
                 else
-                    identityMatrix[i][j] = 0;
+                    customMatrix[i][j] = 0;
             }
         }
-        return identityMatrix;
+        return customMatrix;
     }
     static double[][] MultiplySquareMatrix(double[][] matrA, double[][] matrB){
         int size = matrA.length;
@@ -42,12 +53,13 @@ public class Main {
                 transposeMatrix[j][i] = matrix[i][j];
         return transposeMatrix;
     }
-    static void RotationMethodYakobi(double[][] matrK, double[][] solutions,double epsilont){
+    static double[][] RotationMethodYakobi(double[][] matrK, double[][] solutions,double epsilont){
         int counter=0;
+        double[][] bufSoltuions = solutions.clone();
         while (true) {
             int iMax = 0, jMax = 0;
             double angleFi = 0;
-            double[][] rotationMatrix = GetIdentityMatrix(matrK.length);
+            double[][] rotationMatrix = GetCustomMatrix(matrK.length,true,false);
             double maxElement = Math.abs(matrK[0][1]);
             //находим макс элемент выше диагонали
             for (int i = 0; i < matrK.length; i++) {
@@ -62,9 +74,9 @@ public class Main {
             }
             //находим угол вращения
             angleFi = 0.5 * Math.atan((2 * matrK[iMax][jMax]) / (matrK[iMax][iMax] - matrK[jMax][jMax]));
-            rotationMatrix[iMax][jMax] = -Math.sin(angleFi);
-            rotationMatrix[jMax][iMax] = Math.sin(angleFi);
             rotationMatrix[iMax][iMax] = Math.cos(angleFi);
+            rotationMatrix[iMax][jMax] = -(Math.sin(angleFi));
+            rotationMatrix[jMax][iMax] = Math.sin(angleFi);
             rotationMatrix[jMax][jMax] = Math.cos(angleFi);
             if (matrK[iMax][iMax] == matrK[jMax][jMax]) {
                 angleFi = Math.sqrt(2) / 2;
@@ -78,7 +90,15 @@ public class Main {
             double[][] transposeRotationMatrix = TransposeMatrix(rotationMatrix);
             matrK1 = MultiplySquareMatrix(transposeRotationMatrix,matrK);
             matrK1 = MultiplySquareMatrix(matrK1, rotationMatrix);
-            //TODO: умножение на солюшены
+            double[][] bufArray = GetCustomMatrix(matrK.length, false,false);
+            for(int i=0;i<matrK1.length;i++){
+                for(int j=0;j<matrK1.length;j++){
+                    for(int m=0;m<matrK1.length;m++){
+                        bufArray[i][j] += bufSoltuions[i][m] * rotationMatrix[m][j];
+                    }
+                }
+            }
+            bufSoltuions = bufArray.clone();
             double endIteration = 0;
             for (int i = 0; i < matrK1.length; i++) {
                 for (int j = i + 1; j < matrK1.length; j++) {
@@ -90,31 +110,48 @@ public class Main {
             matrK=matrK1.clone();
             if (endIteration < epsilont) {
                 System.out.println("Number of iterations - " + counter);
+                for(int i=0;i<solutions.length;i++)
+                    for(int j=0;j<solutions.length;j++)
+                        solutions[i][j] = bufSoltuions[i][j];
+                PrintMatrix(matrK);
                 break;
             }
         }
-
+        return matrK;
     }
     static void PrintMatrix(double[][] matrix){
         for(int i=0;i<matrix.length;i++){
             for(int j=0;j<matrix.length;j++){
-                System.out.printf("%.1f ",matrix[i][j]);
+                System.out.printf("%.4f ",matrix[i][j]);
             }
             System.out.println("\n");
         }
     }
     public static void main(String[] args) {
-        double[][] matrA = {
-                {4, 1, -1},
-                {1, 4, -1},
-                {-1, -1, 4}
-        };
+//        double[][] matr = {
+//                {6, 15, 55},
+//                {15, 55, 225},
+//                {55, 225, 979}
+//        };
+//        double[][] matrB = GetCustomMatrix(4, false, true);
+//        PrintMatrix(matrB);
         double[][] matr = GetRandomSymMatr(4);
-        double[][] sol = new double[4][4];
+        double[][] sol = GetCustomMatrix(matr.length,true,false);
         Scanner in = new Scanner(System.in);
-        PrintMatrix(matr);
         System.out.print("Введите точность:");
         double epsilont = in.nextDouble();
-        RotationMethodYakobi(matr,sol,epsilont);
+        matr = RotationMethodYakobi(matr,sol,epsilont);
+        ArrayList<Double> ownValues = new ArrayList();
+        for(int i=0;i<matr.length;i++)
+            ownValues.add(matr[i][i]);
+        for(int i=0;i<matr.length;i++){
+            System.out.println("Найдено собственное значение - " + ownValues.get(i));
+            System.out.println("Найден собственный вектор:");
+            System.out.print("[");
+            for(int j=matr.length-1;j>=0;j--)
+                System.out.print(sol[j][i] + ", ");
+            System.out.print("]\n");
+        }
+        System.out.println("Число обусловленности - " + (double) Collections.max(ownValues) / Collections.min(ownValues));
     }
 }
